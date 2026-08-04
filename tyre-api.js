@@ -8,8 +8,9 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const DEFAULT_TIMEOUT_MS = 10000;
+  const DEFAULT_TIMEOUT_MS = 20000;
   const MAX_TIMEOUT_MS = 120000;
+  const LOOKUP_ENDPOINT = "/api/dvla";
 
   class TyreApiError extends Error {
     constructor(message, options = {}) {
@@ -25,37 +26,6 @@
 
   function isRecord(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
-  }
-
-  function normalizeBackendBase(value) {
-    const candidate = value == null ? "" : String(value).trim();
-    if (!candidate) return "";
-
-    let parsed;
-    try {
-      parsed = new URL(candidate);
-    } catch (cause) {
-      throw new TyreApiError("The tyre service URL is not a valid absolute URL.", {
-        code: "CONFIG_ERROR",
-        cause,
-      });
-    }
-
-    const path = parsed.pathname.replace(/\/+$/, "");
-    if (
-      parsed.protocol !== "https:" ||
-      parsed.username ||
-      parsed.password ||
-      parsed.search ||
-      parsed.hash ||
-      path
-    ) {
-      throw new TyreApiError("The tyre service URL must be an HTTPS origin without a path, query, or credentials.", {
-        code: "CONFIG_ERROR",
-      });
-    }
-
-    return parsed.origin;
   }
 
   function normalizeRegistration(value) {
@@ -90,7 +60,7 @@
       input.registration == null ? input.registrationNumber : input.registration,
     );
 
-    if (!name || !/\p{L}/u.test(name)) {
+    if (!name || name.length > 80 || !/\p{L}/u.test(name)) {
       throw new TyreApiError("Enter a name containing at least one letter.", {
         code: "INVALID_INPUT",
         field: "name",
@@ -98,7 +68,12 @@
     }
 
     const phoneDigits = phone.replace(/\D/g, "");
-    if (!/^[0-9+() .-]+$/.test(phone) || phoneDigits.length < 10 || phoneDigits.length > 15) {
+    if (
+      phone.length > 32 ||
+      !/^[0-9+() .-]+$/.test(phone) ||
+      phoneDigits.length < 10 ||
+      phoneDigits.length > 15
+    ) {
       throw new TyreApiError("Enter a phone number containing 10 to 15 digits.", {
         code: "INVALID_INPUT",
         field: "phone",
@@ -290,6 +265,12 @@
         retryAfter: retryDelay(response, message),
       });
     }
+    if (status === 408 || status === 504) {
+      return new TyreApiError("The tyre lookup timed out.", {
+        code: "TIMEOUT",
+        status,
+      });
+    }
     if (status >= 500) {
       return new TyreApiError("The tyre service is temporarily unavailable.", {
         code: "SERVER_ERROR",
@@ -342,31 +323,23 @@
   }
 
   function createClient(options = {}) {
-    const backendBase = normalizeBackendBase(options.backendBase);
     const timeoutMs = normalizeTimeout(options.timeoutMs);
     const defaultFetch = typeof globalThis !== "undefined" && typeof globalThis.fetch === "function"
       ? globalThis.fetch.bind(globalThis)
       : null;
     const fetchImpl = options.fetchImpl || defaultFetch;
 
-    if (backendBase && typeof fetchImpl !== "function") {
+    if (typeof fetchImpl !== "function") {
       throw new TyreApiError("No fetch implementation is available for the tyre service.", {
         code: "CONFIG_ERROR",
       });
     }
 
     const client = {
-      mode: backendBase ? "live" : "offline",
-      backendBase,
+      mode: "live",
+      endpoint: LOOKUP_ENDPOINT,
       async lookup(input) {
-        if (!backendBase) {
-          throw new TyreApiError("Online tyre lookup is not configured for this build.", {
-            code: "OFFLINE",
-          });
-        }
-
         const payload = buildLookupPayload(input);
-        const endpoint = new URL("/api/dvla", `${backendBase}/`).href;
         const controller = new AbortController();
         let didTimeout = false;
         const timer = setTimeout(() => {
@@ -375,10 +348,16 @@
         }, timeoutMs);
 
         try {
-          const response = await fetchImpl(endpoint, {
+          const response = await fetchImpl(LOOKUP_ENDPOINT, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify(payload),
+            cache: "no-store",
+            credentials: "same-origin",
+            redirect: "error",
             signal: controller.signal,
           });
           const parsed = await readResponse(response);
@@ -415,10 +394,8 @@
               make: scalar(parsed.body.dvla.make),
               colour: scalar(parsed.body.dvla.colour),
               year: scalar(parsed.body.dvla.yearOfManufacture),
-              raw: parsed.body.dvla,
             },
             fitment: classifyFitment(parsed.body.tyres),
-            raw: parsed.body,
           };
         } catch (error) {
           if (didTimeout || (error && error.name === "AbortError")) {
@@ -443,11 +420,11 @@
 
   return Object.freeze({
     DEFAULT_TIMEOUT_MS,
+    LOOKUP_ENDPOINT,
     TyreApiError,
     buildLookupPayload,
     createClient,
     extractTyreSizes,
-    normalizeBackendBase,
     normalizeLookupInput,
     normalizeName,
     normalizePhone,

@@ -3,7 +3,6 @@
 
   const config = Object.assign(
     {
-      backendBase: "",
       contactEmail: "ossettwholesale@gmail.com",
       phone: "07380439443",
     },
@@ -19,7 +18,7 @@
   let reviewTimer = null;
   if (tyreApi) {
     try {
-      tyreClient = tyreApi.createClient({ backendBase: config.backendBase });
+      tyreClient = tyreApi.createClient();
     } catch (error) {
       tyreConfigError = error;
     }
@@ -58,27 +57,27 @@
     },
   ];
 
-  const brandNames = [
-    "Yokohama",
-    "West Lake Tires",
-    "Uniroyal",
-    "Pirelli",
-    "Triangle",
-    "Roadstone",
-    "Michelin",
-    "Hankook",
-    "Riken",
-    "Prestivo Performance Tyres",
-    "Nexen Tire",
-    "Goodyear",
-    "Maxxis",
-    "Matador",
-    "Continental",
-    "Bridgestone",
-    "Leao Tire",
-    "Dunlop",
-    "Giti",
-    "Avon Tyres",
+  const brands = [
+    ["Yokohama", "assets/brands/yokohama.png"],
+    ["West Lake Tires", "assets/brands/west-lake.png"],
+    ["Uniroyal", "assets/brands/uniroyal.png"],
+    ["Pirelli", "assets/brands/pirelli.png"],
+    ["Triangle", "assets/brands/triangle.png"],
+    ["Roadstone", "assets/brands/roadstone.png"],
+    ["Michelin", "assets/brands/michelin.png"],
+    ["Hankook", "assets/brands/hankook.png"],
+    ["Riken", "assets/brands/riken.png"],
+    ["Prestivo Performance Tyres", "assets/brands/prestivo.png"],
+    ["Nexen Tire", "assets/brands/nexen.png"],
+    ["Goodyear", "assets/brands/goodyear.png"],
+    ["Maxxis", "assets/brands/maxxis.png"],
+    ["Matador", "assets/brands/matador.png"],
+    ["Continental", "assets/brands/continental.png"],
+    ["Bridgestone", "assets/brands/bridgestone.png"],
+    ["Leao Tire", "assets/brands/leao.png"],
+    ["Dunlop", "assets/brands/dunlop.png"],
+    ["Giti", "assets/brands/giti.png"],
+    ["Avon Tyres", "assets/brands/avon.png"],
   ];
 
   const reviews = [
@@ -262,7 +261,7 @@
 
   function pageFrame(path, main, options = {}) {
     const bodyClass = options.bodyClass || "";
-    return `${header(path)}<main id="main-content" class="${bodyClass}" tabindex="-1">${main}</main>${footer()}`;
+    return `${header(path)}<main id="main-content" class="${bodyClass}" tabindex="-1">${main}</main>${footer()}${cookieNotice()}`;
   }
 
   function serviceCards({ dark = false } = {}) {
@@ -303,11 +302,9 @@
 
       <section class="brands-section section-shell">
         <h2>Our Brands</h2>
-        ${cookieNotice()}
-        <div class="brand-reference" aria-hidden="true"></div>
-        <div class="brand-grid" aria-label="Tyre brands we stock">
-          ${brandNames.map((name, index) => `<span class="brand brand-${index + 1}">${name}</span>`).join("")}
-        </div>
+        <ul class="brand-grid" aria-label="Tyre brands we stock">
+          ${brands.map(([name, image]) => `<li class="brand"><img src="${image}" alt="${name} tyre logo" loading="lazy" decoding="async" /></li>`).join("")}
+        </ul>
       </section>
 
       <section class="experts-section content-shell">
@@ -468,6 +465,9 @@
 
   function locationSection(variant) {
     const isContact = variant === "contact";
+    const mapTitle = "Interactive map showing Ossett Tyres at 9 Farfield Road, Neepsend, Sheffield";
+    const mapEmbed = "https://www.google.com/maps?q=9%20Farfield%20Rd%2C%20Neepsend%2C%20Sheffield%20S3%208AB&output=embed";
+    const mapLink = "https://maps.app.goo.gl/Y26tW8X6aZchRx6TA";
     return `<section class="location-section content-shell ${isContact ? "contact-location" : "services-location"}">
       <div class="location-copy">
         <h2>${isContact ? "Where are we?" : "Ossett Tyres"}</h2>
@@ -484,7 +484,10 @@
           <li><span>Sunday:</span> 9 a.m - 5 p.m</li>
         </ul>
       </div>
-      <a class="source-media ${isContact ? "contact-map" : "services-map"}" href="https://maps.app.goo.gl/Y26tW8X6aZchRx6TA" target="_blank" rel="noreferrer" aria-label="Open Ossett Tyres in Google Maps"></a>
+      <div class="map-frame ${isContact ? "contact-map" : "services-map"}">
+        <iframe class="map-embed" src="${mapEmbed}" title="${mapTitle}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+        <a class="map-fallback" href="${mapLink}" target="_blank" rel="noreferrer">Open in Google Maps</a>
+      </div>
     </section>`;
   }
 
@@ -595,7 +598,9 @@
     });
 
     const notice = document.querySelector("[data-cookie-notice]");
-    if (notice && sessionStorage.getItem("ossett-cookie-choice")) notice.remove();
+    const hasCookieChoice = Boolean(sessionStorage.getItem("ossett-cookie-choice"));
+    document.body.classList.toggle("cookie-visible", Boolean(notice && !hasCookieChoice));
+    if (notice && hasCookieChoice) notice.remove();
     document.querySelector("[data-cookie-accept]")?.addEventListener("click", () => dismissCookies("accepted"));
     document.querySelector("[data-cookie-decline]")?.addEventListener("click", () => dismissCookies("declined"));
 
@@ -615,6 +620,7 @@
 
   function dismissCookies(choice) {
     sessionStorage.setItem("ossett-cookie-choice", choice);
+    document.body.classList.remove("cookie-visible");
     document.querySelector("[data-cookie-notice]")?.classList.add("is-closing");
     window.setTimeout(() => document.querySelector("[data-cookie-notice]")?.remove(), 180);
   }
@@ -720,11 +726,14 @@
     form.elements.namedItem("phone").value = values.phone;
     form.elements.namedItem("registration").value = values.registration;
 
-    if (!tyreClient || tyreClient.mode !== "live") {
-      const message = tyreConfigError
-        ? "Online tyre lookup is unavailable because this build is not configured correctly."
-        : "Online tyre lookup is not configured for this build.";
-      renderManualTyreState(status, values, message);
+    if (!tyreClient) {
+      renderManualTyreState(
+        status,
+        values,
+        tyreConfigError
+          ? "Online tyre lookup is unavailable because this build is not configured correctly."
+          : "Online tyre lookup is unavailable in this build.",
+      );
       return;
     }
 

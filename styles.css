@@ -404,7 +404,6 @@ h3 {
 }
 
 .source-media,
-.brand-reference,
 .home-hero {
   position: relative;
   overflow: hidden;
@@ -413,7 +412,6 @@ h3 {
 }
 
 .source-media::before,
-.brand-reference::before,
 .home-hero::before {
   position: absolute;
   z-index: -1;
@@ -505,18 +503,27 @@ h3 {
   text-align: center;
 }
 
-.brand-reference {
-  height: 560px;
-  background: #fff;
-  --source-image: var(--home-source);
-  --source-width: 156.86%;
-  --source-height: 760.54%;
-  --source-left: -28.43%;
-  --source-top: -173.75%;
+.brand-grid {
+  display: grid;
+  min-height: 560px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px 52px;
+  padding: 10px 0;
+  margin: 0;
+  list-style: none;
 }
 
-.brand-grid {
-  display: none;
+.brand {
+  display: flex;
+  height: 82px;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .experts-section {
@@ -855,20 +862,27 @@ h3 {
 }
 
 .cookie-notice {
-  position: relative;
-  z-index: 2;
+  position: fixed;
+  z-index: 50;
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
-  width: 100vw;
+  width: 100%;
   min-height: 58px;
   align-items: center;
   gap: 30px;
-  margin-left: calc(50% - 50vw);
+  margin: 0;
   padding: 10px 23px;
   border-block: 1px solid #ededed;
   color: #464646;
   background: rgb(255 255 255 / 98%);
   box-shadow: 0 2px 8px rgb(0 0 0 / 3%);
   transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.cookie-visible .whatsapp-button {
+  bottom: calc(76px + env(safe-area-inset-bottom));
 }
 
 .cookie-notice.is-closing {
@@ -1067,14 +1081,57 @@ h3 {
 }
 
 .services-map {
+  position: relative;
+  overflow: hidden;
   width: 606px;
   height: 400px;
   justify-self: end;
+  background: #e8ecef;
   --source-image: var(--services-source);
   --source-width: 316.83%;
   --source-height: 662.75%;
   --source-left: -159.41%;
   --source-top: -470%;
+}
+
+.map-frame::before {
+  position: absolute;
+  z-index: 0;
+  width: var(--source-width);
+  height: var(--source-height);
+  background-image: var(--source-image);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  content: "";
+  inset: var(--source-top) auto auto var(--source-left);
+}
+
+.map-embed {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.map-fallback {
+  position: absolute;
+  z-index: 2;
+  right: 12px;
+  bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgb(0 0 0 / 12%);
+  border-radius: 5px;
+  color: #202124;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 1px 5px rgb(0 0 0 / 20%);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.map-fallback:hover {
+  background: #fff;
 }
 
 /* Blog */
@@ -1420,9 +1477,12 @@ h3 {
 }
 
 .contact-map {
+  position: relative;
+  overflow: hidden;
   width: 652px;
   height: 413px;
   justify-self: end;
+  background: #e8ecef;
   --source-image: var(--contact-source);
   --source-width: 294.48%;
   --source-height: 518.4%;
@@ -1668,48 +1728,14 @@ h3 {
     font-size: 40px;
   }
 
-  .brand-reference {
-    display: none;
-  }
-
   .brand-grid {
-    display: grid;
+    min-height: 0;
     grid-template-columns: repeat(3, 1fr);
     gap: 24px 20px;
   }
 
   .brand {
-    display: flex;
-    min-height: 62px;
-    align-items: center;
-    justify-content: center;
-    padding: 8px;
-    font-size: 19px;
-    font-weight: 800;
-    font-style: italic;
-    line-height: 1;
-    text-align: center;
-    text-transform: uppercase;
-  }
-
-  .brand-4,
-  .brand-18,
-  .brand-19 {
-    color: #d71920;
-    background: #ffe92f;
-  }
-
-  .brand-7 {
-    color: #1d5a9d;
-  }
-
-  .brand-10,
-  .brand-13 {
-    color: #e53d2e;
-  }
-
-  .brand-15 {
-    background: #efc548;
+    height: 70px;
   }
 
   .brands-section {
@@ -1911,12 +1937,12 @@ h3 {
 
   .brand-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 24px 12px;
+    gap: 22px 14px;
+    padding: 0;
   }
 
   .brand {
-    min-height: 52px;
-    font-size: 15px;
+    height: 58px;
   }
 
   .experts-section {
@@ -2063,7 +2089,11 @@ h3 {
     align-items: flex-start;
     flex-direction: column;
     gap: 10px;
-    padding: 15px 18px;
+    padding: 15px 18px calc(15px + env(safe-area-inset-bottom));
+  }
+
+  .cookie-visible .whatsapp-button {
+    bottom: calc(148px + env(safe-area-inset-bottom));
   }
 
   .cookie-notice p {

@@ -33,7 +33,6 @@ function mockResponse(status, body, headers = {}) {
 
 function clientReturning(status, body, headers) {
   return tyreApi.createClient({
-    backendBase: "https://api.example.test",
     fetchImpl: async () => mockResponse(status, body, headers),
   });
 }
@@ -75,26 +74,27 @@ test("normalizes input and builds the exact backend payload", () => {
     () => tyreApi.normalizeLookupInput({ ...validInput, phone: "----------" }),
     (error) => error.code === "INVALID_INPUT" && error.field === "phone",
   );
+  assert.throws(
+    () => tyreApi.normalizeLookupInput({ ...validInput, name: "A".repeat(81) }),
+    (error) => error.code === "INVALID_INPUT" && error.field === "name",
+  );
+  assert.throws(
+    () => tyreApi.normalizeLookupInput({ ...validInput, phone: "1".repeat(33) }),
+    (error) => error.code === "INVALID_INPUT" && error.field === "phone",
+  );
 });
 
-test("validates and normalizes the backend origin", () => {
-  assert.equal(tyreApi.normalizeBackendBase(""), "");
-  assert.equal(tyreApi.normalizeBackendBase("https://api.example.test/"), "https://api.example.test");
-  assert.throws(
-    () => tyreApi.normalizeBackendBase("http://api.example.test"),
-    (error) => error.code === "CONFIG_ERROR",
-  );
-  assert.throws(
-    () => tyreApi.normalizeBackendBase("https://api.example.test/backend"),
-    (error) => error.code === "CONFIG_ERROR",
-  );
-  assert.equal(tyreApi.createClient({ backendBase: "" }).mode, "offline");
+test("uses a fixed same-origin lookup endpoint", () => {
+  const client = tyreApi.createClient({ fetchImpl: async () => mockResponse(503, {}) });
+  assert.equal(tyreApi.DEFAULT_TIMEOUT_MS, 20000);
+  assert.equal(client.mode, "live");
+  assert.equal(client.endpoint, "/api/dvla");
+  assert.equal(tyreApi.LOOKUP_ENDPOINT, "/api/dvla");
 });
 
 test("posts the exact lookup request and separates vehicle and fitment data", async () => {
   let captured;
   const client = tyreApi.createClient({
-    backendBase: "https://api.example.test/",
     fetchImpl: async (url, options) => {
       captured = { url, options };
       return mockResponse(200, {
@@ -106,9 +106,15 @@ test("posts the exact lookup request and separates vehicle and fitment data", as
   });
 
   const result = await client.lookup(validInput);
-  assert.equal(captured.url, "https://api.example.test/api/dvla");
+  assert.equal(captured.url, "/api/dvla");
   assert.equal(captured.options.method, "POST");
-  assert.deepEqual(captured.options.headers, { "Content-Type": "application/json" });
+  assert.deepEqual(captured.options.headers, {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  });
+  assert.equal(captured.options.cache, "no-store");
+  assert.equal(captured.options.credentials, "same-origin");
+  assert.equal(captured.options.redirect, "error");
   assert.deepEqual(JSON.parse(captured.options.body), {
     registrationNumber: "AB12CDE",
     customerName: "Ada Lovelace",
@@ -121,6 +127,8 @@ test("posts the exact lookup request and separates vehicle and fitment data", as
   );
   assert.equal(result.fitment.status, "available");
   assert.deepEqual(result.fitment.sizes, ["225/45R17", "255/40R17"]);
+  assert.equal("raw" in result, false);
+  assert.equal("raw" in result.vehicle, false);
 });
 
 test("distinguishes a found vehicle from unavailable or unrecognized fitment", async () => {
@@ -159,7 +167,7 @@ test("rejects malformed success responses", async () => {
   );
 });
 
-test("maps 400, 429, and 500 responses to actionable error categories", async () => {
+test("maps 400, 429, 500, and 504 responses to actionable error categories", async () => {
   await assert.rejects(
     clientReturning(400, { error: "Invalid VRM format" }).lookup(validInput),
     (error) => error.code === "INVALID_REQUEST" && error.status === 400 && error.field === "registration",
@@ -176,11 +184,14 @@ test("maps 400, 429, and 500 responses to actionable error categories", async ()
     clientReturning(500, { error: "Server error" }).lookup(validInput),
     (error) => error.code === "SERVER_ERROR" && error.status === 500,
   );
+  await assert.rejects(
+    clientReturning(504, { error: "upstream_timeout" }).lookup(validInput),
+    (error) => error.code === "TIMEOUT" && error.status === 504,
+  );
 });
 
 test("aborts a lookup that exceeds its timeout", async () => {
   const client = tyreApi.createClient({
-    backendBase: "https://api.example.test",
     timeoutMs: 15,
     fetchImpl: async (_url, options) => new Promise((_resolve, reject) => {
       options.signal.addEventListener("abort", () => {
@@ -199,7 +210,6 @@ test("aborts a lookup that exceeds its timeout", async () => {
 
 test("keeps timeout classification when the response body stalls", async () => {
   const client = tyreApi.createClient({
-    backendBase: "https://api.example.test",
     timeoutMs: 15,
     fetchImpl: async (_url, options) => ({
       ok: true,
@@ -245,7 +255,9 @@ test("extracts textual and structured tyre sizes on a best-effort basis", () => 
 test("keeps verified routes and responsive review controls wired", () => {
   const root = join(__dirname, "..");
   const appSource = readFileSync(join(root, "app.js"), "utf8");
+  const configSource = readFileSync(join(root, "config.js"), "utf8");
   const serverSource = readFileSync(join(root, "server.py"), "utf8");
+  const tyreSource = readFileSync(join(root, "tyre-api.js"), "utf8");
 
   for (const route of ["/services", "/blog", "/contact-us", "/order-your-tyres-online", "/blog-post", "/blog-post1"]) {
     const routePattern = new RegExp(`(["'])${route.replaceAll("/", "\\/")}\\1`);
@@ -265,6 +277,31 @@ test("keeps verified routes and responsive review controls wired", () => {
   assert.match(appSource, /matchMedia\("\(max-width: 940px\)"\)/);
   assert.match(appSource, /if \(!event\.matches\) setMobileMenuOpen\(false\)/);
   assert.doesNotMatch(appSource, /data-fallback-image|M Rahman/);
+  assert.match(tyreSource, /LOOKUP_ENDPOINT = "\/api\/dvla"/);
+  assert.match(tyreSource, /credentials: "same-origin"/);
+  assert.match(tyreSource, /redirect: "error"/);
+  assert.doesNotMatch(tyreSource, /backendBase|normalizeBackendBase/);
+  assert.doesNotMatch(appSource, /backendBase/);
+  assert.doesNotMatch(configSource, /backendBase|API_KEY/);
+});
+
+test("keeps the clarified cookie, logo, and map requirements wired", () => {
+  const root = join(__dirname, "..");
+  const appSource = readFileSync(join(root, "app.js"), "utf8");
+  const styleSource = readFileSync(join(root, "styles.css"), "utf8");
+  const logoPaths = appSource.match(/assets\/brands\/[a-z-]+\.png/g) || [];
+
+  assert.equal(logoPaths.length, 20);
+  assert.equal(new Set(logoPaths).size, 20);
+  assert.match(appSource, /<img src="\$\{image\}" alt="\$\{name\} tyre logo"/);
+  assert.match(appSource, /<iframe class="map-embed"/);
+  assert.match(appSource, /output=embed/);
+  assert.match(appSource, /loading="lazy"/);
+  assert.match(appSource, />Open in Google Maps<\/a>/);
+  assert.match(appSource, /\$\{footer\(\)\}\$\{cookieNotice\(\)\}/);
+  assert.match(styleSource, /\.cookie-notice\s*\{[\s\S]*?position:\s*fixed;/);
+  assert.match(styleSource, /\.brand-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,/);
+  assert.match(styleSource, /@media \(max-width: 680px\)[\s\S]*?\.brand-grid\s*\{[\s\S]*?repeat\(2,/);
 });
 
 (async () => {
