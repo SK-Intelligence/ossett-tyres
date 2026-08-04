@@ -46,7 +46,7 @@ The 390px interaction harness verified:
 ## Automated and security checks
 
 `npm run check` passes JavaScript syntax checks and Python byte compilation.
-`npm test` passes 12 Node assertions and 23 Python tests. Coverage includes:
+`npm test` passes 12 Node assertions and 24 Python tests. Coverage includes:
 
 - exact same-origin `POST /api/dvla` browser requests;
 - input validation, request-size/media-type limits, aligned timeouts,

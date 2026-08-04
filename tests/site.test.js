@@ -289,10 +289,11 @@ test("keeps the clarified cookie, logo, and map requirements wired", () => {
   const root = join(__dirname, "..");
   const appSource = readFileSync(join(root, "app.js"), "utf8");
   const styleSource = readFileSync(join(root, "styles.css"), "utf8");
-  const logoPaths = appSource.match(/assets\/brands\/[a-z-]+\.png/g) || [];
+  const logoPaths = appSource.match(/\/assets\/brands\/[a-z-]+\.png/g) || [];
 
   assert.equal(logoPaths.length, 20);
   assert.equal(new Set(logoPaths).size, 20);
+  assert.ok(logoPaths.every((path) => path.startsWith("/assets/brands/")));
   assert.match(appSource, /<img src="\$\{image\}" alt="\$\{name\} tyre logo"/);
   assert.match(appSource, /<iframe class="map-embed"/);
   assert.match(appSource, /output=embed/);

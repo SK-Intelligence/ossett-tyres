@@ -2,6 +2,8 @@
 
 import io
 import json
+import socket
+import threading
 import unittest
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler
@@ -49,6 +51,21 @@ class FakeResponse:
 
     def read(self, size=-1):
         return self.body if size < 0 else self.body[:size]
+
+
+class OneShotHandler(Handler):
+    """Serve one request so static delivery can be tested over a socket pair."""
+
+    def handle(self):
+        self.handle_one_request()
+
+    def log_message(self, _format, *args):
+        pass
+
+
+class DummyServer:
+    server_name = "localhost"
+    server_port = 4173
 
 
 class HandlerTests(unittest.TestCase):
@@ -119,6 +136,47 @@ class HandlerTests(unittest.TestCase):
             with self.subTest(public_path=public_path):
                 self.assertTrue((ROOT / public_path.lstrip("/")).is_file())
                 self.assert_serves(public_path + "?v=1", public_path)
+
+    def test_brand_logo_is_delivered_as_png_from_its_root_url(self):
+        client, server = socket.socketpair()
+        worker = threading.Thread(
+            target=OneShotHandler,
+            args=(server, ("127.0.0.1", 12345), DummyServer()),
+            daemon=True,
+        )
+        try:
+            worker.start()
+            client.sendall(
+                b"GET /assets/brands/yokohama.png HTTP/1.0\r\n"
+                b"Host: localhost\r\nConnection: close\r\n\r\n"
+            )
+            client.settimeout(2)
+            response = bytearray()
+            content_length = None
+            while True:
+                chunk = client.recv(65536)
+                if not chunk:
+                    break
+                response.extend(chunk)
+                if b"\r\n\r\n" not in response:
+                    continue
+                headers, body = bytes(response).split(b"\r\n\r\n", 1)
+                if content_length is None:
+                    for line in headers.splitlines():
+                        if line.lower().startswith(b"content-length:"):
+                            content_length = int(line.split(b":", 1)[1])
+                            break
+                if content_length is not None and len(body) >= content_length:
+                    break
+        finally:
+            client.close()
+            server.close()
+            worker.join(timeout=1)
+
+        headers, body = bytes(response).split(b"\r\n\r\n", 1)
+        self.assertIn(b"HTTP/1.0 200 OK", headers)
+        self.assertIn(b"Content-type: image/png", headers)
+        self.assertEqual(body[:8], b"\x89PNG\r\n\x1a\n")
 
     def test_repository_files_and_directories_are_not_exposed(self):
         private_paths = (
