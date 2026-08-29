@@ -276,6 +276,8 @@ test("keeps verified routes and responsive review controls wired", () => {
   assert.match(appSource, /focus: Boolean\(window\.location\.hash\)/);
   assert.match(appSource, /matchMedia\("\(max-width: 940px\)"\)/);
   assert.match(appSource, /if \(!event\.matches\) setMobileMenuOpen\(false\)/);
+  assert.match(appSource, /event\.key !== "Escape"/);
+  assert.match(appSource, /document\.querySelector\("\.menu-toggle"\)\?\.focus\(\)/);
   assert.doesNotMatch(appSource, /data-fallback-image|M Rahman/);
   assert.match(tyreSource, /LOOKUP_ENDPOINT = "\/api\/dvla"/);
   assert.match(tyreSource, /credentials: "same-origin"/);
@@ -295,10 +297,13 @@ test("keeps the clarified cookie, logo, and map requirements wired", () => {
   assert.equal(new Set(logoPaths).size, 20);
   assert.ok(logoPaths.every((path) => path.startsWith("/assets/brands/")));
   assert.match(appSource, /<img src="\$\{image\}" alt="\$\{name\} tyre logo"/);
+  assert.match(appSource, /alt="\$\{name\} tyre logo" width="160" height="48"/);
   assert.match(appSource, /<iframe class="map-embed"/);
   assert.match(appSource, /output=embed/);
+  assert.match(appSource, /maps\/dir\/\?api=1&destination=/);
   assert.match(appSource, /loading="lazy"/);
   assert.match(appSource, />Open in Google Maps<\/a>/);
+  assert.doesNotMatch(styleSource, /\.map-frame::before/);
   assert.match(appSource, /\$\{footer\(\)\}\$\{cookieNotice\(\)\}/);
   assert.match(styleSource, /\.cookie-notice\s*\{[\s\S]*?position:\s*fixed;/);
   assert.match(styleSource, /\.brand-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,/);
