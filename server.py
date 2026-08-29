@@ -5,6 +5,7 @@ import http.client
 import hashlib
 import json
 import math
+import mimetypes
 import os
 import re
 import socket
@@ -16,6 +17,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlencode, urlsplit
 
+mimetypes.add_type("image/x-icon", ".ico")
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 ROOT = Path(__file__).resolve().parent
 
@@ -35,6 +38,15 @@ PUBLIC_FILES = {
     "/app.js",
     "/site-utils.js",
     "/tyre-api.js",
+    "/favicon.ico",
+    "/favicon-16x16.png",
+    "/favicon-32x32.png",
+    "/favicon-192x192.png",
+    "/favicon-512x512.png",
+    "/apple-touch-icon.png",
+    "/site.webmanifest",
+    "/assets/tyre-logo.png",
+    "/assets/whatsapp-logo.png",
     "/assets/hero-vintage.png",
     "/assets/source/blog-desktop.png",
     "/assets/source/contact-desktop.png",
