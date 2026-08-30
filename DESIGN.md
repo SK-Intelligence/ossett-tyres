@@ -3,7 +3,7 @@
 ## Source of truth
 - Status: Active
 - Last refreshed: 2026-08-29
-- Primary product surfaces: Home, services, tyre availability, contact, blog index, two article routes, shared navigation/footer, cookie notice, mobile navigation.
+- Primary product surfaces: Home, services, tyre availability, standalone tyre enquiry, contact, blog index, two article routes, shared navigation/footer, cookie notice, mobile navigation.
 - Evidence reviewed: `README.md`, `VALIDATION.md`, `index.html`, `app.js`, `styles.css`, `tyre-api.js`, `site-utils.js`, `server.py`, automated tests, all source imagery and brand logos, and fresh full-page captures of every route at 1440px, 768px, and 390px under `artifacts/redesign-baseline/`.
 
 ## Brand
@@ -13,7 +13,7 @@
 
 ## Product goals
 - Goals: Make checking tyre availability the unmistakable primary action; make urgent call/WhatsApp access immediate; communicate local credibility and service breadth; preserve SEO-rich automotive content and existing integrations.
-- Non-goals: Rebuild the application stack, invent an e-commerce checkout, obscure existing hours/address/contact details, or present the availability enquiry as confirmed ordering.
+- Non-goals: Rebuild the application stack, invent a checkout or undocumented TyreScope/Bond behavior, obscure existing hours/address/contact details, or present fallback availability enquiries as confirmed orders.
 - Success signals: Visitors can identify the business, location, services, and primary action in the opening viewport; the tyre and contact forms remain usable; all routes render cohesively without overflow or broken behavior at desktop, tablet, and mobile.
 
 ## Personas and jobs
@@ -47,8 +47,8 @@
 
 ## Components
 - Existing components to reuse: SPA header/footer shell, source-media crop system, tyre lookup logic, contact mailto flow, location/map section, review carousel logic, cookie choice, WhatsApp link, brand image list, and shared routing/focus handling.
-- New/changed components: Explicit wordmark, desktop find-tyres header CTA, home hero tyre-finder panel, proof rail, labelled service ledger, honest review cards, editorial blog header/list, order-page process panel, contact decision paths, richer utility footer, and mobile bottom action dock.
-- Variants and states: Yellow primary, dark secondary, light/outline tertiary; light/dark cards; compact/full tyre form; active navigation; hover/pressed/focus/disabled/loading/success/error/manual form states; open/closed mobile menu; visible/dismissed cookie notice.
+- New/changed components: Explicit wordmark, desktop find-tyres header CTA, home hero tyre-finder panel, proof rail, labelled service ledger, honest review cards, editorial blog header/list, configurable TyreScope embed with loading/error/unavailable states, standalone workshop-job-card tyre enquiry, order-page process panel, contact decision paths, richer utility footer, and mobile bottom action dock.
+- Variants and states: Blue primary, dark secondary, light/outline tertiary; light/dark cards; compact/full tyre form; active navigation; hover/pressed/focus/disabled/loading/success/error/manual form states; open/closed mobile menu; visible/dismissed cookie notice.
 - Token/component ownership: CSS custom properties and shared component selectors live in `styles.css`; structural page templates and behavior hooks stay in `app.js`.
 
 ## Accessibility

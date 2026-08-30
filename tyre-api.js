@@ -292,6 +292,7 @@
       return {
         status: "unavailable",
         sizes: [],
+        pairs: [],
         reason: "The fitment service did not return data.",
       };
     }
@@ -299,14 +300,23 @@
       return {
         status: "unavailable",
         sizes: [],
+        pairs: [],
         reason: typeof value.error === "string" ? value.error : "The fitment service returned an error.",
       };
     }
 
     const sizes = extractTyreSizes(value);
+    const sourcePairs = isRecord(value) && Array.isArray(value.fitments) ? value.fitments : [];
+    const pairs = sourcePairs.slice(0, 24).map((pair) => {
+      if (!isRecord(pair)) return null;
+      const front = extractTyreSizes(pair.front, { limit: 1 })[0] || "";
+      const rear = extractTyreSizes(pair.rear, { limit: 1 })[0] || "";
+      return front || rear ? Object.freeze({ front, rear }) : null;
+    }).filter(Boolean);
     return {
       status: sizes.length ? "available" : "no-sizes",
       sizes,
+      pairs,
       reason: sizes.length ? "" : "No recognised OE tyre sizes were present in the response.",
     };
   }

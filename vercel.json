@@ -1,9 +1,11 @@
 {
   "framework": null,
   "rewrites": [
+    { "source": "/config.js", "destination": "/api/config" },
     { "source": "/services", "destination": "/index.html" },
     { "source": "/blog", "destination": "/index.html" },
     { "source": "/contact-us", "destination": "/index.html" },
+    { "source": "/tyre-enquiry", "destination": "/index.html" },
     { "source": "/order-your-tyres-online", "destination": "/index.html" },
     { "source": "/blog-post", "destination": "/index.html" },
     { "source": "/blog-post1", "destination": "/index.html" }

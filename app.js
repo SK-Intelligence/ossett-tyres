@@ -5,6 +5,8 @@
     {
       contactEmail: "ossettwholesale@gmail.com",
       phone: "07380439443",
+      tyrescopeEmbedUrl: "",
+      web3FormsAccessKey: "",
     },
     window.OSSETT_CONFIG || {},
   );
@@ -13,8 +15,12 @@
   const whatsappNumber = siteUtils.whatsappNumber(config.phone);
 
   const tyreApi = window.OssettTyreApi || null;
+  const tyreEnquiryApi = window.OssettTyreEnquiry || null;
+  const tyreScope = window.OssettTyreScope || null;
   let tyreClient = null;
+  let tyreEnquiryClient = null;
   let tyreConfigError = null;
+  let tyreEnquiryConfigError = null;
   let reviewTimer = null;
   if (tyreApi) {
     try {
@@ -24,6 +30,15 @@
     }
   } else {
     tyreConfigError = new Error("The tyre API adapter did not load.");
+  }
+  if (tyreEnquiryApi) {
+    try {
+      tyreEnquiryClient = tyreEnquiryApi.createClient({ accessKey: config.web3FormsAccessKey });
+    } catch (error) {
+      tyreEnquiryConfigError = error;
+    }
+  } else {
+    tyreEnquiryConfigError = new Error("The tyre enquiry adapter did not load.");
   }
 
   const navItems = [
@@ -79,6 +94,12 @@
     ["Giti", "/assets/brands/giti.png"],
     ["Avon Tyres", "/assets/brands/avon.png"],
   ];
+
+  const enquiryBrandsByTier = Object.freeze({
+    Premium: ["Bridgestone", "Continental", "Goodyear", "Michelin", "Pirelli", "Yokohama"],
+    "Mid-range": ["Avon Tyres", "Dunlop", "Giti", "Hankook", "Matador", "Maxxis", "Nexen Tire", "Riken", "Roadstone", "Uniroyal"],
+    Budget: ["Leao Tire", "Prestivo Performance Tyres", "Riken", "Roadstone", "Triangle", "West Lake Tires"],
+  });
 
   const reviews = [
     {
@@ -449,11 +470,120 @@
     </section>`;
   }
 
+  function tyreScopeExperience() {
+    return `<section class="tyrescope-panel" data-tyrescope-embed data-tyrescope-state="initial" aria-labelledby="tyrescope-title">
+      <div class="tyrescope-panel-heading">
+        <p class="eyebrow">Online tyre ordering</p>
+        <h2 id="tyrescope-title">Find tyres for your vehicle</h2>
+        <p>Enter your registration or tyre details to compare suitable options and arrange fitting with Ossett Tyres.</p>
+      </div>
+      <div class="tyrescope-stage">
+        <p class="tyrescope-status" data-tyrescope-status role="status" aria-live="polite">Preparing tyre search…</p>
+        <iframe
+          class="tyrescope-frame"
+          data-tyrescope-frame
+          title="Search and order tyres from Ossett Tyres"
+          loading="lazy"
+          referrerpolicy="strict-origin-when-cross-origin"
+          hidden
+        ></iframe>
+      </div>
+      <div class="tyrescope-fallback" data-tyrescope-fallback hidden>
+        ${tyreForm({ heading: "Check your vehicle and ask about stock" })}
+      </div>
+      <aside class="integration-warning" data-tyrescope-dev-warning hidden>
+        <strong>Local setup note</strong>
+        <p>Add the official account-specific <code>TYRESCOPE_EMBED_URL</code> to activate the ecommerce panel. No URL has been fabricated.</p>
+      </aside>
+    </section>`;
+  }
+
+  function enquiryBrandOptions(list = brands.map(([name]) => name)) {
+    return `<option value="">Any / Best value</option>${[...list].sort().map((name) => `<option value="${name}">${name}</option>`).join("")}<option value="Other">Other brand</option>`;
+  }
+
+  function tyreEnquiryPage(path) {
+    const main = `<section class="enquiry-masthead dark-section">
+      <div class="content-shell enquiry-masthead-layout">
+        <div><p class="eyebrow">Tyre availability enquiry</p><h1>Tell us exactly<br />what you need.</h1></div>
+        <div class="enquiry-masthead-copy"><p>Check your vehicle, confirm the tyre sizes and send the workshop one complete request. We’ll come back to you with availability and pricing.</p><ul><li>No payment is taken</li><li>Fitment checked by the workshop</li><li>Budget through to premium options</li></ul></div>
+      </div>
+    </section>
+    <section class="enquiry-workbench content-shell" aria-labelledby="enquiry-form-title">
+      <aside class="enquiry-progress" aria-label="Enquiry progress">
+        <p class="eyebrow">Workshop job card</p>
+        <ol>
+          <li class="is-current" data-enquiry-progress="1" aria-current="step"><span>01</span><strong>Vehicle</strong><small>Your details and registration</small></li>
+          <li data-enquiry-progress="2"><span>02</span><strong>Tyres</strong><small>Sizes, quantity and preferences</small></li>
+          <li data-enquiry-progress="3"><span>03</span><strong>Send</strong><small>Contact details and notes</small></li>
+        </ol>
+        <p class="enquiry-progress-note">This is an enquiry, not an order. Ossett Tyres will confirm fitment, stock and price before any work is booked.</p>
+      </aside>
+      <form class="enquiry-form panel" data-enquiry-form novalidate>
+        <input type="hidden" name="requestId" />
+        <label class="enquiry-honeypot" aria-hidden="true">Website<input name="website" type="text" tabindex="-1" autocomplete="off" /></label>
+
+        <fieldset class="enquiry-step" data-enquiry-step="1">
+          <legend><span>Step 1</span></legend><h2 id="enquiry-form-title">Find your vehicle</h2>
+          <p class="enquiry-step-intro">Start with your contact details and registration so we can find the vehicle.</p>
+          <div class="enquiry-grid enquiry-grid-two">
+            <label>Full name<input name="name" type="text" autocomplete="name" maxlength="80" placeholder="Your full name…" required /></label>
+            <label>Phone number<input name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="32" placeholder="07xxx xxxxxx…" required /></label>
+          </div>
+          <div class="enquiry-registration-row">
+            <label>Registration<input class="registration-input" name="registration" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="8" placeholder="AB12 CDE…" required /></label>
+            <button class="button button-dark enquiry-lookup" type="button" data-enquiry-lookup><span>Find vehicle</span></button>
+          </div>
+          <p class="form-status enquiry-lookup-status" data-enquiry-lookup-status role="status" aria-live="polite"></p>
+          <button class="enquiry-manual-link" type="button" data-enquiry-manual hidden>Continue by entering tyre sizes manually</button>
+        </fieldset>
+
+        <fieldset class="enquiry-step" data-enquiry-step="2" hidden disabled>
+          <legend><span>Step 2</span></legend><h2>Choose tyre details</h2>
+          <div class="vehicle-confirmation" data-enquiry-vehicle-summary role="status"></div>
+          <p class="enquiry-step-intro" data-enquiry-fitment-note>Choose a suggested size or enter the size printed on your tyre sidewall.</p>
+          <div class="tyre-axle-grid">
+            <section class="tyre-axle" aria-labelledby="front-tyre-heading">
+              <div class="tyre-axle-heading"><span>Front axle</span><h3 id="front-tyre-heading">Front tyres</h3></div>
+              <label>Suggested size<select name="frontTyreSelect" data-enquiry-front-select><option value="">Enter manually below</option></select></label>
+              <label>Manual tyre size<input name="frontTyreManual" inputmode="text" autocomplete="off" maxlength="32" placeholder="e.g. 225/40 R18…" /></label>
+              <label>Quantity<input name="frontQuantity" type="number" inputmode="numeric" autocomplete="off" min="0" max="4" step="1" value="0" required /></label>
+            </section>
+            <section class="tyre-axle" aria-labelledby="rear-tyre-heading">
+              <div class="tyre-axle-heading"><span>Rear axle</span><h3 id="rear-tyre-heading">Rear tyres</h3></div>
+              <label>Suggested size<select name="rearTyreSelect" data-enquiry-rear-select><option value="">Enter manually below</option></select></label>
+              <label>Manual tyre size<input name="rearTyreManual" inputmode="text" autocomplete="off" maxlength="32" placeholder="e.g. 245/35 R18…" /></label>
+              <label>Quantity<input name="rearQuantity" type="number" inputmode="numeric" autocomplete="off" min="0" max="4" step="1" value="0" required /></label>
+            </section>
+          </div>
+          <div class="enquiry-grid enquiry-grid-two enquiry-preferences">
+            <label>Budget range<select name="budgetTier"><option value="">Any</option><option>Budget</option><option>Mid-range</option><option>Premium</option></select></label>
+            <div class="brand-choice"><label>Preferred tyre brand<select name="preferredBrand" data-enquiry-brand>${enquiryBrandOptions()}</select></label><label data-enquiry-brand-other hidden>Other brand<input name="otherBrand" autocomplete="off" maxlength="60" placeholder="e.g. Falken or Kumho…" disabled /></label></div>
+          </div>
+          <details class="tyre-size-guide"><summary>How to read a tyre size</summary><p><strong>225/40 R18</strong> means a 225mm width, a sidewall height equal to 40% of that width, radial construction, and an 18-inch wheel diameter.</p></details>
+        </fieldset>
+
+        <fieldset class="enquiry-step" data-enquiry-step="3" hidden disabled>
+          <legend><span>Step 3</span></legend><h2>Send your enquiry</h2>
+          <p class="enquiry-step-intro">Add an email address and any fitting preferences. Ossett Tyres will use these details to review and respond to this enquiry.</p>
+          <label>Email address<input name="email" type="email" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@example.com…" required /></label>
+          <label>Notes <span class="label-note">Optional</span><textarea name="notes" rows="4" autocomplete="off" maxlength="1000" placeholder="Preferred fitting day, time or anything else we should know…"></textarea></label>
+          <p class="enquiry-safety-note">Tyre sizes are supplied by third-party fitment data. Check the size printed on the tyre sidewall or door-jamb sticker before sending.</p>
+          <p class="enquiry-privacy">Your contact and vehicle details are sent to Ossett Tyres through Web3Forms so we can answer this enquiry. <a href="https://web3forms.com/privacy" target="_blank" rel="noopener noreferrer" aria-label="Read the Web3Forms privacy policy (opens in a new tab)">Read the Web3Forms privacy policy</a>.</p>
+          <button class="button button-primary enquiry-send" type="submit"><span>Send tyre enquiry</span></button>
+          <p class="form-status enquiry-submit-status" data-enquiry-submit-status role="status" aria-live="polite"></p>
+        </fieldset>
+      </form>
+    </section>
+    <section class="enquiry-fallback content-shell"><p>Need an answer urgently?</p><a class="button button-dark" href="tel:${phoneHref}">Call ${config.phone}</a><a class="text-link" href="https://wa.me/${whatsappNumber}" target="_blank" rel="noreferrer">Message on WhatsApp</a></section>`;
+    return pageFrame(path, main, { bodyClass: "tyre-enquiry-page" });
+  }
+
   function contactPage(path) {
     const main = `
       <section class="contact-masthead page-masthead dark-section"><div class="content-shell"><p class="eyebrow">Contact Ossett Tyres</p><h1>Tell us what<br />your car needs.</h1><p>Choose the quickest route below. Tyre enquiries go straight to availability checking; servicing and general questions come to the workshop team.</p></div></section>
       <section class="contact-paths content-shell" aria-label="Ways to contact Ossett Tyres">
-        <article class="contact-path contact-path-urgent"><p class="eyebrow">Tyres or urgent repair</p><h2>Need to get moving?</h2><p>Check tyre availability by registration, call for immediate advice, or message the workshop on WhatsApp.</p><div class="contact-path-actions"><a class="button button-primary" href="#contact-tyre-finder">Check availability</a><a class="button button-dark" href="tel:${phoneHref}">Call ${config.phone}</a><a class="text-link" href="https://wa.me/${whatsappNumber}" target="_blank" rel="noreferrer">Message on WhatsApp</a></div></article>
+        <article class="contact-path contact-path-urgent"><p class="eyebrow">Tyres or urgent repair</p><h2>Need to get moving?</h2><p>Send a detailed tyre enquiry, call for immediate advice, or message the workshop on WhatsApp.</p><div class="contact-path-actions"><a class="button button-primary" href="/tyre-enquiry">Send tyre enquiry</a><a class="button button-dark" href="tel:${phoneHref}">Call ${config.phone}</a><a class="text-link" href="https://wa.me/${whatsappNumber}" target="_blank" rel="noreferrer">Message on WhatsApp</a></div></article>
         <article class="contact-path contact-path-general"><p class="eyebrow">Servicing &amp; general enquiry</p><h2>Planning workshop work?</h2><p>Send the details using the enquiry form. Our team aims to get back to you within 24 hours.</p><a class="text-link" href="#general-enquiry">Write to the workshop <span aria-hidden="true">↓</span></a></article>
       </section>
       <section class="contact-form-section content-shell" id="general-enquiry">
@@ -503,8 +633,8 @@
   }
 
   function orderPage(path) {
-    const main = `<section class="order-hero dark-section"><div class="order-layout content-shell"><div class="order-intro"><p class="eyebrow">Tyre availability</p><h1>Start with your registration.</h1><p>We’ll identify your vehicle and possible original-equipment tyre sizes. Then call us to confirm the right fitment, live stock and price.</p><ul class="order-assurances"><li>No checkout or payment</li><li>Fitment always confirmed by the workshop</li><li>Budget to premium options available</li></ul></div><div class="order-content">${tyreForm({ heading: "Find tyres for your vehicle" })}</div></div></section>
-      <section class="order-process content-shell"><header class="section-heading split-heading"><div><p class="eyebrow">How it works</p><h2>From registration to fitting.</h2></div><p>A quick lookup starts the conversation. Our team confirms the details before any tyre is fitted.</p></header><ol class="process-list"><li><span>01</span><h3>Enter your details</h3><p>Tell us who to contact and enter the vehicle registration.</p></li><li><span>02</span><h3>Check possible sizes</h3><p>We’ll show available vehicle and original-equipment fitment information.</p></li><li><span>03</span><h3>Call to confirm</h3><p>Speak with the workshop to verify size, live stock, price and fitting.</p></li></ol><div class="order-help"><p>Registration not recognised or need a tyre urgently?</p><a class="button button-dark" href="tel:${phoneHref}">Call ${config.phone}</a></div></section>`;
+    const main = `<section class="order-hero dark-section"><div class="order-layout content-shell"><div class="order-intro"><p class="eyebrow">Tyres &amp; fitting</p><h1>Find tyres for your vehicle.</h1><p>Search by registration or tyre details, choose suitable tyres and arrange fitting with our Sheffield workshop.</p><ul class="order-assurances"><li>Budget, mid-range and premium options</li><li>Fitting at Ossett Tyres</li><li>Workshop support if online search is unavailable</li></ul></div><div class="order-content">${tyreScopeExperience()}</div></div></section>
+      <section class="order-process content-shell"><header class="section-heading split-heading"><div><p class="eyebrow">How it works</p><h2>From search to fitting.</h2></div><p>The online experience and the workshop remain connected, with direct help available whenever you need it.</p></header><ol class="process-list"><li><span>01</span><h3>Find the right tyres</h3><p>Use your registration or tyre details to see compatible choices.</p></li><li><span>02</span><h3>Choose and arrange fitting</h3><p>Review the available options, quantity and fitting details supplied through the official ecommerce service.</p></li><li><span>03</span><h3>Get workshop support</h3><p>Call Ossett Tyres if you need urgent help or want the team to verify fitment before booking.</p></li></ol><div class="order-help"><p>Tyre search unavailable or need a tyre urgently?</p><a class="button button-dark" href="tel:${phoneHref}">Call ${config.phone}</a></div></section>`;
     return pageFrame(path, main, { bodyClass: "order-page" });
   }
 
@@ -532,6 +662,7 @@
     "/services": servicesPage,
     "/blog": blogPage,
     "/contact-us": contactPage,
+    "/tyre-enquiry": tyreEnquiryPage,
     "/order-your-tyres-online": orderPage,
   };
 
@@ -541,9 +672,25 @@
       "/services": "Tyre Services Sheffield | Ossett Tyres",
       "/blog": "Automotive Advice | Ossett Tyres Blog",
       "/contact-us": "Contact Ossett Tyres",
+      "/tyre-enquiry": "Request Tyre Availability & Pricing | Ossett Tyres",
       "/order-your-tyres-online": "Find Tyres in Sheffield | Ossett Tyres",
     };
     document.title = titles[path] || (articles[path] ? `${articles[path].title} | Ossett Tyres` : "Page not found | Ossett Tyres");
+  }
+
+  function setDocumentMeta(path) {
+    const descriptions = {
+      "/": "Ossett Tyres provides expert tyre repair, tyre sales and dependable car servicing in Sheffield.",
+      "/services": "Tyre repairs, replacement tyres and dependable car servicing from Ossett Tyres in Sheffield.",
+      "/blog": "Practical tyre, maintenance and vehicle advice from Ossett Tyres in Sheffield.",
+      "/contact-us": "Contact Ossett Tyres in Neepsend, Sheffield for tyre fitting, puncture repairs and car servicing.",
+      "/tyre-enquiry": "Send Ossett Tyres your vehicle and tyre requirements to request availability, pricing and fitting information.",
+      "/order-your-tyres-online": "Find suitable tyres for your vehicle and arrange fitting with Ossett Tyres in Sheffield.",
+    };
+    const description = document.querySelector('meta[name="description"]');
+    if (description) description.content = descriptions[path] || "Ossett Tyres in Sheffield.";
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.href = new URL(path, "https://ossetttyres.co.uk").href;
   }
 
   function getHashTarget(hash) {
@@ -584,6 +731,7 @@
     }
     document.body.dataset.route = path.replace(/^\//, "") || "home";
     setDocumentTitle(path);
+    setDocumentMeta(path);
     bindPageInteractions();
     finishNavigation({ scroll, focus, hash });
   }
@@ -627,7 +775,366 @@
         input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
       });
     });
+    bindTyreEnquiryForm();
+    const tyreScopeContainer = document.querySelector("[data-tyrescope-embed]");
+    if (tyreScopeContainer) {
+      if (tyreScope) {
+        tyreScope.mount(tyreScopeContainer, config);
+      } else {
+        tyreScopeContainer.dataset.tyrescopeState = "error";
+        tyreScopeContainer.querySelector("[data-tyrescope-fallback]")?.removeAttribute("hidden");
+        const state = tyreScopeContainer.querySelector("[data-tyrescope-status]");
+        if (state) state.textContent = "Online tyre ordering is unavailable. Use the registration check below or contact the workshop.";
+      }
+    }
     bindReviews();
+  }
+
+  function bindTyreEnquiryForm() {
+    const form = document.querySelector("[data-enquiry-form]");
+    if (!form) return;
+
+    const lookupButton = form.querySelector("[data-enquiry-lookup]");
+    const lookupStatus = form.querySelector("[data-enquiry-lookup-status]");
+    const manualButton = form.querySelector("[data-enquiry-manual]");
+    const submitStatus = form.querySelector("[data-enquiry-submit-status]");
+    const submitButton = form.querySelector(".enquiry-send");
+    const registrationInput = form.elements.namedItem("registration");
+    const requestIdInput = form.elements.namedItem("requestId");
+    const frontSelect = form.elements.namedItem("frontTyreSelect");
+    const rearSelect = form.elements.namedItem("rearTyreSelect");
+    const brandSelect = form.elements.namedItem("preferredBrand");
+    const tierSelect = form.elements.namedItem("budgetTier");
+    const brandOtherWrap = form.querySelector("[data-enquiry-brand-other]");
+    const brandOtherInput = form.elements.namedItem("otherBrand");
+    const steps = [...form.querySelectorAll("[data-enquiry-step]")];
+    let vehicle = null;
+    let lookupRegistration = "";
+    let lookupSequence = 0;
+
+    try {
+      requestIdInput.value = tyreEnquiryApi.createRequestId();
+    } catch (error) {
+      submitStatus.className = "form-status enquiry-submit-status is-error";
+      submitStatus.textContent = "This browser cannot prepare the enquiry form. Please call the workshop.";
+      lookupButton.disabled = true;
+      return;
+    }
+
+    const setProgress = (stage) => {
+      document.querySelectorAll("[data-enquiry-progress]").forEach((item) => {
+        const itemStage = Number(item.dataset.enquiryProgress);
+        item.classList.toggle("is-complete", itemStage < stage);
+        item.classList.toggle("is-current", itemStage === stage);
+        if (itemStage === stage) item.setAttribute("aria-current", "step");
+        else item.removeAttribute("aria-current");
+      });
+    };
+
+    const showDetailSteps = () => {
+      for (const step of steps.slice(1)) {
+        step.hidden = false;
+        step.disabled = false;
+      }
+      setProgress(2);
+    };
+
+    const resetDetailSteps = () => {
+      vehicle = null;
+      lookupRegistration = "";
+      setSelectOptions(frontSelect, []);
+      setSelectOptions(rearSelect, []);
+      form.elements.namedItem("frontTyreManual").value = "";
+      form.elements.namedItem("rearTyreManual").value = "";
+      form.elements.namedItem("frontQuantity").value = "0";
+      form.elements.namedItem("rearQuantity").value = "0";
+      tierSelect.value = "";
+      brandSelect.innerHTML = enquiryBrandOptions();
+      brandOtherWrap.hidden = true;
+      brandOtherInput.disabled = true;
+      brandOtherInput.value = "";
+      for (const step of steps.slice(1)) {
+        step.hidden = true;
+        step.disabled = true;
+      }
+      lookupStatus.className = "form-status enquiry-lookup-status";
+      lookupStatus.textContent = "";
+      manualButton.hidden = true;
+      submitStatus.className = "form-status enquiry-submit-status";
+      submitStatus.textContent = "";
+      setProgress(1);
+    };
+
+    const setSelectOptions = (select, values) => {
+      select.replaceChildren(new Option("Enter manually below", ""));
+      for (const value of [...new Set(values.filter(Boolean))]) {
+        select.add(new Option(value, value));
+      }
+      if (select.options.length === 2) select.selectedIndex = 1;
+    };
+
+    const showVehicle = (result, registration, manual = false) => {
+      const parts = manual
+        ? [registration, "Vehicle details entered manually"]
+        : [registration, result.vehicle.make, result.vehicle.colour, result.vehicle.year]
+          .filter((value) => value !== null && value !== "")
+          .map(String);
+      vehicle = manual
+        ? { make: "", colour: "", year: "" }
+        : {
+          make: result.vehicle.make == null ? "" : String(result.vehicle.make),
+          colour: result.vehicle.colour == null ? "" : String(result.vehicle.colour),
+          year: result.vehicle.year == null ? "" : String(result.vehicle.year),
+        };
+      lookupRegistration = registration;
+      const summary = form.querySelector("[data-enquiry-vehicle-summary]");
+      summary.textContent = parts.join(" · ");
+      summary.tabIndex = -1;
+
+      const pairs = manual ? [] : result.fitment.pairs || [];
+      const allSizes = manual ? [] : result.fitment.sizes || [];
+      const frontSizes = pairs.map((pair) => pair.front || pair.rear).filter(Boolean);
+      const rearSizes = pairs.map((pair) => pair.rear || pair.front).filter(Boolean);
+      setSelectOptions(frontSelect, frontSizes.length ? frontSizes : allSizes);
+      setSelectOptions(rearSelect, rearSizes.length ? rearSizes : allSizes);
+
+      const fitmentNote = form.querySelector("[data-enquiry-fitment-note]");
+      if (manual) {
+        fitmentNote.textContent = "Enter the exact sizes printed on the tyre sidewall or door-jamb sticker.";
+      } else if (result.fitment.status === "available") {
+        fitmentNote.textContent = "Suggested OE sizes were found. Confirm them against the tyre sidewall or door-jamb sticker.";
+      } else {
+        fitmentNote.textContent = "Vehicle details were found, but suggested sizes were unavailable. Enter the sizes manually.";
+      }
+      showDetailSteps();
+      lookupStatus.className = "form-status enquiry-lookup-status is-success";
+      lookupStatus.textContent = manual ? "Continue with the tyre details below." : "Vehicle found. Check the details below.";
+      manualButton.hidden = true;
+      summary.focus({ preventScroll: true });
+      summary.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "center",
+      });
+    };
+
+    const showLookupError = (message) => {
+      lookupStatus.className = "form-status enquiry-lookup-status is-error";
+      lookupStatus.textContent = message;
+      manualButton.hidden = false;
+    };
+
+    lookupButton.addEventListener("click", async () => {
+      form.querySelectorAll("input, select, textarea").forEach((field) => field.setCustomValidity(""));
+      const name = form.elements.namedItem("name");
+      const phone = form.elements.namedItem("phone");
+      if (!name.value.trim() || !phone.value.trim() || !registrationInput.value.trim()) {
+        steps[0].querySelector(":invalid")?.reportValidity();
+        return;
+      }
+      if (!tyreClient) {
+        showLookupError(
+          tyreConfigError
+            ? "Vehicle lookup is unavailable. Continue by entering the tyre sizes manually."
+            : "Vehicle lookup did not load. Continue by entering the tyre sizes manually.",
+        );
+        return;
+      }
+
+      let values;
+      try {
+        values = tyreApi.normalizeLookupInput({
+          name: name.value,
+          phone: phone.value,
+          registration: registrationInput.value,
+        });
+      } catch (error) {
+        const field = error.field ? form.elements.namedItem(error.field) : null;
+        if (field) {
+          field.setCustomValidity(error.message);
+          field.reportValidity();
+        } else {
+          showLookupError(error.message || "Check your details and try again.");
+        }
+        return;
+      }
+
+      name.value = values.name;
+      phone.value = values.phone;
+      registrationInput.value = values.registration;
+      const requestSequence = ++lookupSequence;
+      lookupButton.disabled = true;
+      lookupButton.classList.add("is-loading");
+      lookupStatus.className = "form-status enquiry-lookup-status";
+      lookupStatus.textContent = "Searching for your vehicle…";
+      manualButton.hidden = true;
+      try {
+        const result = await tyreClient.lookup(values);
+        if (!tyreEnquiryApi.lookupMatches(
+          registrationInput.value,
+          values.registration,
+          requestSequence,
+          lookupSequence,
+        )) return;
+        showVehicle(result, values.registration);
+      } catch (error) {
+        if (!tyreEnquiryApi.lookupMatches(
+          registrationInput.value,
+          values.registration,
+          requestSequence,
+          lookupSequence,
+        )) return;
+        let message = "We could not find the vehicle. Check the registration or continue manually.";
+        if (error && error.code === "TIMEOUT") message = "The lookup took too long. Try again or continue manually.";
+        if (error && error.code === "RATE_LIMIT") message = "Too many searches were made. Wait briefly or continue manually.";
+        if (error && ["SERVER_ERROR", "NETWORK_ERROR", "MALFORMED_RESPONSE"].includes(error.code)) {
+          message = "Vehicle lookup is temporarily unavailable. Continue by entering the tyre sizes manually.";
+        }
+        showLookupError(message);
+      } finally {
+        lookupButton.disabled = false;
+        lookupButton.classList.remove("is-loading");
+      }
+    });
+
+    manualButton.addEventListener("click", () => {
+      try {
+        const values = tyreApi.normalizeLookupInput({
+          name: form.elements.namedItem("name").value,
+          phone: form.elements.namedItem("phone").value,
+          registration: registrationInput.value,
+        });
+        form.elements.namedItem("name").value = values.name;
+        form.elements.namedItem("phone").value = values.phone;
+        registrationInput.value = values.registration;
+        showVehicle(null, values.registration, true);
+      } catch (error) {
+        const field = error.field ? form.elements.namedItem(error.field) : null;
+        if (field) {
+          field.setCustomValidity(error.message);
+          field.reportValidity();
+        }
+      }
+    });
+
+    registrationInput.addEventListener("input", () => {
+      lookupSequence += 1;
+      if (lookupButton.disabled) {
+        lookupStatus.className = "form-status enquiry-lookup-status";
+        lookupStatus.textContent = "Registration changed. Find the vehicle again.";
+      }
+      if (lookupRegistration && tyreEnquiryApi.normalizeRegistration(registrationInput.value) !== lookupRegistration) {
+        resetDetailSteps();
+      }
+    });
+
+    tierSelect.addEventListener("change", () => {
+      const tierBrands = enquiryBrandsByTier[tierSelect.value] || brands.map(([name]) => name);
+      brandSelect.innerHTML = enquiryBrandOptions(tierBrands);
+      brandOtherWrap.hidden = true;
+      brandOtherInput.disabled = true;
+      brandOtherInput.value = "";
+    });
+
+    brandSelect.addEventListener("change", () => {
+      const isOther = brandSelect.value === "Other";
+      brandOtherWrap.hidden = !isOther;
+      brandOtherInput.disabled = !isOther;
+      if (isOther) brandOtherInput.focus();
+      else brandOtherInput.value = "";
+    });
+
+    steps.slice(1).forEach((step) => {
+      step.addEventListener("focusin", () => setProgress(Number(step.dataset.enquiryStep)));
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      form.querySelectorAll("input, select, textarea").forEach((field) => field.setCustomValidity(""));
+      if (!vehicle || !lookupRegistration) {
+        showLookupError("Find the vehicle or continue manually before sending the enquiry.");
+        steps[0].scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+          block: "start",
+        });
+        return;
+      }
+      if (!form.reportValidity()) return;
+      if (!tyreEnquiryClient) {
+        submitStatus.className = "form-status enquiry-submit-status is-error";
+        submitStatus.textContent = tyreEnquiryConfigError
+          ? "Online enquiries are unavailable. Please call the workshop."
+          : "The enquiry service did not load. Please call the workshop.";
+        return;
+      }
+
+      const frontManual = form.elements.namedItem("frontTyreManual").value;
+      const rearManual = form.elements.namedItem("rearTyreManual").value;
+      const preferredBrand = brandSelect.value === "Other"
+        ? brandOtherInput.value
+        : brandSelect.value;
+      const input = {
+        requestId: requestIdInput.value,
+        name: form.elements.namedItem("name").value,
+        phone: form.elements.namedItem("phone").value,
+        email: form.elements.namedItem("email").value,
+        registration: lookupRegistration,
+        vehicleMake: vehicle.make,
+        vehicleColour: vehicle.colour,
+        vehicleYear: vehicle.year,
+        frontTyreSize: frontManual.trim() || frontSelect.value,
+        rearTyreSize: rearManual.trim() || rearSelect.value,
+        frontQuantity: form.elements.namedItem("frontQuantity").value,
+        rearQuantity: form.elements.namedItem("rearQuantity").value,
+        budgetTier: tierSelect.value,
+        preferredBrand,
+        notes: form.elements.namedItem("notes").value,
+        website: form.elements.namedItem("website").value,
+      };
+
+      let normalized;
+      try {
+        normalized = tyreEnquiryApi.normalizeEnquiryInput(input);
+      } catch (error) {
+        const fieldMap = {
+          frontTyreSize: frontManual.trim() ? form.elements.namedItem("frontTyreManual") : frontSelect,
+          rearTyreSize: rearManual.trim() ? form.elements.namedItem("rearTyreManual") : rearSelect,
+          preferredBrand: brandOtherInput,
+        };
+        const field = fieldMap[error.field] || form.elements.namedItem(error.field);
+        if (field && typeof field.setCustomValidity === "function") {
+          field.setCustomValidity(error.message);
+          field.reportValidity();
+        } else {
+          submitStatus.className = "form-status enquiry-submit-status is-error";
+          submitStatus.textContent = error.message || "Check the enquiry and try again.";
+        }
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.classList.add("is-loading");
+      submitStatus.className = "form-status enquiry-submit-status";
+      submitStatus.textContent = "Sending your enquiry…";
+      try {
+        await tyreEnquiryClient.submit(normalized);
+        form.dataset.enquirySubmitted = "true";
+        submitStatus.className = "form-status enquiry-submit-status is-success";
+        submitStatus.textContent = "Enquiry sent. The Ossett Tyres team will contact you about availability and pricing.";
+        setProgress(4);
+      } catch (error) {
+        submitStatus.className = "form-status enquiry-submit-status is-error";
+        if (error && error.code === "TIMEOUT") {
+          submitStatus.textContent = "The request timed out and may have been delivered. Call the workshop before sending it again.";
+        } else if (error && error.code === "RATE_LIMIT") {
+          submitStatus.textContent = "This enquiry was already sent or too many requests were made. Please wait before trying again.";
+        } else {
+          submitStatus.textContent = "The enquiry could not be delivered. Please call or message the workshop.";
+        }
+        submitButton.disabled = false;
+      } finally {
+        submitButton.classList.remove("is-loading");
+      }
+    });
   }
 
   function dismissCookies(choice) {

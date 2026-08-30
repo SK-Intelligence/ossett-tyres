@@ -5,8 +5,8 @@
   "description": "Responsive Ossett Tyres website recreation",
   "scripts": {
     "start": "python3 server.py",
-    "check": "node --check site-utils.js && node --check tyre-api.js && node --check app.js && node --check config.js && node --check api/dvla.js && node --check api/_lib/cors.js && node --check api/_lib/cooldown.js && node --check api/_lib/validate.js && node --check api/_lib/upstream.js && node --check api/_lib/logging.js && node --check api/_lib/email.js && python3 -m py_compile server.py",
-    "test": "node tests/site.test.js && python3 -m unittest tests.server_test"
+    "check": "node --check site-utils.js && node --check tyre-api.js && node --check tyre-enquiry.js && node --check tyrescope-embed.js && node --check app.js && node --check config.js && node --check api/dvla.js && node --check api/_lib/cors.js && node --check api/_lib/cooldown.js && node --check api/_lib/validate.js && node --check api/_lib/upstream.js && node --check api/_lib/logging.js && node --check api/_lib/email.js && python3 -m py_compile server.py api/config.py api/dvla.py lib/tyres/*.py lib/tyres/suppliers/*.py",
+    "test": "node tests/site.test.js && node tests/tyre-enquiry.test.js && node tests/tyrescope.test.js && python3 -m unittest discover -s tests -p '*_test.py'"
   },
   "engines": {
     "node": ">=18",

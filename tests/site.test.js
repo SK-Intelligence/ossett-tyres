@@ -100,7 +100,7 @@ test("posts the exact lookup request and separates vehicle and fitment data", as
       return mockResponse(200, {
         ok: true,
         dvla: { make: "Ford", colour: "Blue", yearOfManufacture: 2020 },
-        tyres: { front: "225/45 R17 91W", rear: "255/40R17" },
+        tyres: { fitments: [{ front: "225/45 R17 91W", rear: "255/40R17" }] },
       });
     },
   });
@@ -127,6 +127,7 @@ test("posts the exact lookup request and separates vehicle and fitment data", as
   );
   assert.equal(result.fitment.status, "available");
   assert.deepEqual(result.fitment.sizes, ["225/45R17", "255/40R17"]);
+  assert.deepEqual(result.fitment.pairs, [{ front: "225/45R17", rear: "255/40R17" }]);
   assert.equal("raw" in result, false);
   assert.equal("raw" in result.vehicle, false);
 });
@@ -259,7 +260,7 @@ test("keeps verified routes and responsive review controls wired", () => {
   const serverSource = readFileSync(join(root, "server.py"), "utf8");
   const tyreSource = readFileSync(join(root, "tyre-api.js"), "utf8");
 
-  for (const route of ["/services", "/blog", "/contact-us", "/order-your-tyres-online", "/blog-post", "/blog-post1"]) {
+  for (const route of ["/services", "/blog", "/contact-us", "/tyre-enquiry", "/order-your-tyres-online", "/blog-post", "/blog-post1"]) {
     const routePattern = new RegExp(`(["'])${route.replaceAll("/", "\\/")}\\1`);
     assert.match(appSource, routePattern, `${route} must be registered in the client`);
     assert.match(serverSource, routePattern, `${route} must be registered in the server`);

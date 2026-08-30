@@ -12,3 +12,4 @@ artifacts/generated/
 # local agent/session state
 .omc/
 artifacts/
+.vercel

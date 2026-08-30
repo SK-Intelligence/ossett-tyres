@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dependency-free site server and same-origin vehicle lookup proxy."""
+"""Dependency-free site server and same-origin vehicle/enquiry API boundary."""
 
 import http.client
 import hashlib
@@ -27,6 +27,7 @@ ROUTES = {
     "/services",
     "/blog",
     "/contact-us",
+    "/tyre-enquiry",
     "/order-your-tyres-online",
     "/blog-post",
     "/blog-post1",
@@ -38,6 +39,8 @@ PUBLIC_FILES = {
     "/app.js",
     "/site-utils.js",
     "/tyre-api.js",
+    "/tyre-enquiry.js",
+    "/tyrescope-embed.js",
     "/favicon.ico",
     "/favicon-16x16.png",
     "/favicon-32x32.png",
@@ -96,6 +99,24 @@ TYRE_SIZE_PATTERN = re.compile(
     r"\b(\d{3})\s*/\s*(\d{2,3})\s*(Z?\s*R)\s*(\d{2}(?:[.,]5)?)\b",
     re.IGNORECASE,
 )
+
+
+def public_tyrescope_embed_url(value=None):
+    """Return a browser-safe official embed URL or an empty disabled value."""
+
+    candidate = os.environ.get("TYRESCOPE_EMBED_URL", "") if value is None else value
+    candidate = str(candidate or "").strip()
+    if not candidate or len(candidate) > 2048:
+        return ""
+    parsed = urlsplit(candidate)
+    if (
+        parsed.scheme != "https"
+        or not parsed.netloc
+        or parsed.username
+        or parsed.password
+    ):
+        return ""
+    return candidate
 
 
 class ApiError(Exception):
@@ -188,6 +209,8 @@ def runtime_config():
         or DEFAULT_CONTACT_EMAIL,
         "phone": os.environ.get("OSSETT_PHONE", DEFAULT_PHONE).strip()
         or DEFAULT_PHONE,
+        "tyrescopeEmbedUrl": public_tyrescope_embed_url(),
+        "web3FormsAccessKey": os.environ.get("WEB3FORMS_ACCESS_KEY", "").strip(),
     }
 
 

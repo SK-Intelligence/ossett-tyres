@@ -28,6 +28,7 @@ private struct CaptureArguments {
         let supportedStates = [
             "default", "menu-open", "menu-route", "skip-link",
             "cookie-accept", "review-controls", "tyre-manual", "popstate", "menu-resize",
+            "tyrescope-configured", "tyrescope-error", "enquiry-details",
         ]
         guard supportedStates.contains(state) else {
             Self.printUsage()
@@ -42,7 +43,7 @@ private struct CaptureArguments {
     }
 
     private static func printUsage() {
-        let usage = "Usage: capture.swift <route> <width> <height> <output.png> [default|menu-open|menu-route|skip-link|cookie-accept|review-controls|tyre-manual|popstate|menu-resize]\n"
+        let usage = "Usage: capture.swift <route> <width> <height> <output.png> [default|menu-open|menu-route|skip-link|cookie-accept|review-controls|tyre-manual|popstate|menu-resize|tyrescope-configured|tyrescope-error|enquiry-details]\n"
         FileHandle.standardError.write(Data(usage.utf8))
     }
 }
@@ -176,7 +177,7 @@ private func knownRoutes(from serverSource: String) -> [String] {
     return Array(Set(routes)).sorted()
 }
 
-private func preparedDocument(siteRoot: URL) throws -> String {
+private func preparedDocument(siteRoot: URL, state: String) throws -> String {
     var html = try source(at: siteRoot.appendingPathComponent("index.html"))
     var css = try source(at: siteRoot.appendingPathComponent("styles.css"))
     var appJavaScript = try source(at: siteRoot.appendingPathComponent("config.js"))
@@ -185,7 +186,17 @@ private func preparedDocument(siteRoot: URL) throws -> String {
         + "\n"
         + source(at: siteRoot.appendingPathComponent("tyre-api.js"))
         + "\n"
+        + source(at: siteRoot.appendingPathComponent("tyre-enquiry.js"))
+        + "\n"
+        + source(at: siteRoot.appendingPathComponent("tyrescope-embed.js"))
+        + "\n"
         + source(at: siteRoot.appendingPathComponent("app.js"))
+    if state == "tyrescope-configured" || state == "tyrescope-error" {
+        appJavaScript = appJavaScript.replacingOccurrences(
+            of: "tyrescopeEmbedUrl: \"\"",
+            with: "tyrescopeEmbedUrl: \"https://tyrescope.test/embed\""
+        )
+    }
     let serverSource = try source(at: siteRoot.appendingPathComponent("server.py"))
 
     css = css.replacingOccurrences(
@@ -270,6 +281,18 @@ private func preparedDocument(siteRoot: URL) throws -> String {
         pattern: #"<script[^>]+src=[\"']/tyre-api\.js[\"'][^>]*></script>"#,
         with: "",
         requiredTag: "the /tyre-api.js script"
+    )
+    html = try replacingMatches(
+        in: html,
+        pattern: #"<script[^>]+src=[\"']/tyre-enquiry\.js[\"'][^>]*></script>"#,
+        with: "",
+        requiredTag: "the /tyre-enquiry.js script"
+    )
+    html = try replacingMatches(
+        in: html,
+        pattern: #"<script[^>]+src=[\"']/tyrescope-embed\.js[\"'][^>]*></script>"#,
+        with: "",
+        requiredTag: "the /tyrescope-embed.js script"
     )
     html = try replacingMatches(
         in: html,
@@ -391,6 +414,8 @@ private let auditScript = #"""
         phoneLink: Boolean(status.querySelector('a[href^="tel:"]'))
       };
     })(),
+    tyrescopeState: (document.querySelector('[data-tyrescope-embed]') || {}).dataset &&
+      document.querySelector('[data-tyrescope-embed]').dataset.tyrescopeState || null,
     menuPanel: (function () {
       var panel = document.querySelector('.primary-nav');
       if (!panel) return null;
@@ -462,9 +487,27 @@ private final class CaptureDelegate: NSObject, WebFrameLoadDelegate {
             )
         }
 
+        if arguments.state == "enquiry-details" {
+            _ = webView.stringByEvaluatingJavaScript(
+                from: "document.documentElement.style.scrollBehavior='auto';var form=document.querySelector('[data-enquiry-form]');if(form){form.querySelector('[name=\"name\"]').value='Ada Lovelace';form.querySelector('[name=\"phone\"]').value='07380 439443';var registration=form.querySelector('[name=\"registration\"]');registration.value='AB12CDE';var manual=form.querySelector('[data-enquiry-manual]');manual.hidden=false;manual.click();form.querySelector('[name=\"frontTyreManual\"]').value='225/45 R17';form.querySelector('[name=\"frontQuantity\"]').value='2';form.querySelector('[name=\"rearTyreManual\"]').value='255/40 R17';form.querySelector('[name=\"rearQuantity\"]').value='2';form.querySelector('[name=\"budgetTier\"]').value='Mid-range';form.querySelector('[name=\"email\"]').value='ada@example.test';window.setTimeout(function(){window.scrollTo(0,0);},250);}"
+            )
+        }
+
         if arguments.state == "popstate" {
             _ = webView.stringByEvaluatingJavaScript(
                 from: "var destination=document.querySelector('.primary-nav a[href=\"/services\"]');if(destination){destination.click();history.replaceState({},'', '/');window.dispatchEvent(new PopStateEvent('popstate'));}"
+            )
+        }
+
+        if arguments.state == "tyrescope-configured" {
+            _ = webView.stringByEvaluatingJavaScript(
+                from: "var container=document.querySelector('[data-tyrescope-embed]');if(container){container.dataset.tyrescopeState='ready';var stage=container.querySelector('.tyrescope-stage');var fallback=container.querySelector('[data-tyrescope-fallback]');if(fallback){fallback.hidden=true;}if(stage){stage.innerHTML='<div style=\"min-height:680px;padding:34px;background:#fff;color:#242c36\"><p style=\"font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#1258d6\">Official ecommerce test surface</p><h3 style=\"margin:14px 0;font-size:32px\">Search tyres by registration</h3><p>This capture uses a non-purchasing layout fixture. The production frame URL must come from TyreScope.</p><label style=\"display:block;margin-top:30px;font-weight:700\">Registration<input style=\"display:block;width:100%;margin-top:8px;padding:14px;border:1px solid #aeb8c7\" value=\"AB12 CDE\"></label></div>';}}"
+            )
+        }
+
+        if arguments.state == "tyrescope-error" {
+            _ = webView.stringByEvaluatingJavaScript(
+                from: "var container=document.querySelector('[data-tyrescope-embed]');if(container){container.dataset.tyrescopeState='error';var frame=container.querySelector('[data-tyrescope-frame]');var fallback=container.querySelector('[data-tyrescope-fallback]');var status=container.querySelector('[data-tyrescope-status]');if(frame){frame.hidden=true;}if(fallback){fallback.hidden=false;}if(status){status.textContent='Online tyre ordering is unavailable just now. Use the registration check below or contact the workshop.';}}"
             )
         }
 
@@ -534,7 +577,7 @@ let siteRoot = URL(
 
 let html: String
 do {
-    html = try preparedDocument(siteRoot: siteRoot)
+    html = try preparedDocument(siteRoot: siteRoot, state: arguments.state)
 } catch {
     fail(error.localizedDescription)
 }

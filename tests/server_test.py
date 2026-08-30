@@ -29,6 +29,7 @@ from server import (
     canonical_tyre_size,
     lookup_vehicle,
     normalise_lookup_payload,
+    runtime_config,
 )
 
 
@@ -119,6 +120,7 @@ class HandlerTests(unittest.TestCase):
                 "/services",
                 "/blog",
                 "/contact-us",
+                "/tyre-enquiry",
                 "/order-your-tyres-online",
                 "/blog-post",
                 "/blog-post1",
@@ -235,15 +237,21 @@ class HandlerTests(unittest.TestCase):
         unknown.send_response.assert_called_once_with(HTTPStatus.NOT_FOUND)
         self.assertEqual(self.response_json(unknown)["error"], "not_found")
 
-    def test_runtime_config_excludes_provider_secrets(self):
+    def test_runtime_config_exposes_only_browser_safe_values(self):
         handler = self.api_handler(path="/config.js?deployment=1")
         sentinel_dvla = "test-only-dvla-secret"
         sentinel_oneauto = "test-only-oneauto-secret"
+        sentinel_account = "test-only-tyrescope-account"
+        sentinel_supplier = "test-only-supplier-secret"
+        public_web3forms_key = "123e4567-e89b-42d3-a456-426614174111"
         env = {
             "DVLA_API_KEY": sentinel_dvla,
             "ONEAUTO_API_KEY": sentinel_oneauto,
+            "TYRESCOPE_ACCOUNT_ID": sentinel_account,
+            "TYRESCOPE_API_KEY": sentinel_supplier,
             "OSSETT_CONTACT_EMAIL": "team@example.test",
             "OSSETT_PHONE": "0114 123 4567",
+            "WEB3FORMS_ACCESS_KEY": public_web3forms_key,
         }
         with patch.dict("os.environ", env, clear=False):
             Handler.do_GET(handler)
@@ -254,12 +262,39 @@ class HandlerTests(unittest.TestCase):
         payload = json.loads(body[len(prefix) : -3])
         self.assertEqual(
             payload,
-            {"contactEmail": "team@example.test", "phone": "0114 123 4567"},
+            {
+                "contactEmail": "team@example.test",
+                "phone": "0114 123 4567",
+                "tyrescopeEmbedUrl": "",
+                "web3FormsAccessKey": public_web3forms_key,
+            },
         )
         self.assertNotIn(sentinel_dvla, body)
         self.assertNotIn(sentinel_oneauto, body)
+        self.assertNotIn(sentinel_account, body)
+        self.assertNotIn(sentinel_supplier, body)
         self.assertNotIn("backendBase", body)
         self.assertIn(call("Cache-Control", "no-store"), handler.send_header.call_args_list)
+
+    def test_runtime_config_accepts_only_https_embed_urls_without_credentials(self):
+        with patch.dict(
+            "os.environ",
+            {"TYRESCOPE_EMBED_URL": "https://partner.example/embed?garage=ossett"},
+            clear=False,
+        ):
+            self.assertEqual(
+                runtime_config()["tyrescopeEmbedUrl"],
+                "https://partner.example/embed?garage=ossett",
+            )
+        for unsafe_url in (
+            "http://partner.example/embed",
+            "javascript:alert(1)",
+            "https://user:secret@partner.example/embed",
+        ):
+            with self.subTest(unsafe_url=unsafe_url), patch.dict(
+                "os.environ", {"TYRESCOPE_EMBED_URL": unsafe_url}, clear=False
+            ):
+                self.assertEqual(runtime_config()["tyrescopeEmbedUrl"], "")
 
     def test_post_rejects_bad_content_and_payload_shapes(self):
         cases = [
